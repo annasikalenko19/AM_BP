@@ -1,0 +1,219 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Main</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+
+    <pre id="elm"></pre>
+    <input type="file" id="file-input" style="display: none;" />
+    <script src="elm.js"></script>
+
+    <script>
+        const savedCode = localStorage.getItem("savedCode") || "";
+
+        var app = Elm.Main.init({
+            node: document.getElementById('elm'),
+            flags: savedCode
+        });
+        app.ports.saveToLocalStorage.subscribe(function (code) {
+            localStorage.setItem("savedCode", code);
+        });
+
+        app.ports.exportCode.subscribe(function (codeContent) {
+            var filename = 'exported_code.txt';
+            var blob = new Blob([codeContent], { type: 'text/plain;charset=utf-8' });
+
+            if (window.navigator.msSaveOrOpenBlob) {
+                window.navigator.msSaveOrOpenBlob(blob, filename);
+            } else {
+                var link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+
+                document.body.removeChild(link);
+            }
+        });
+
+        if (app.ports.importCode) {
+            app.ports.importCode.subscribe(() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.txt';
+                input.onchange = (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const content = reader.result;
+                            app.ports.receiveCode.send(content);
+                        };
+                        reader.readAsText(file);
+                    }
+                };
+                input.click();
+            });
+        } else {
+            console.log('Available ports:', app.ports);
+        }	
+    </script>
+    <script>
+        console.log('JavaScript is working');
+        document.querySelector('.code-area').addEventListener('input', (e) => {
+            console.log('Input detected:', e.target.value);
+        });
+    </script>
+
+    <script>
+        app.ports.scrollToElement.subscribe(function (elementId) {
+            console.log("Port received:", elementId);  // ✅ Должно появиться в Console
+            scrollToElement(elementId);
+        });
+
+        app.ports.scrollToRegister.subscribe(function (elementId) {
+            console.log("Scrolling to register:", elementId);
+            scrollToElement(elementId);
+        });
+
+        function scrollToElement(elementId) {
+            console.log("Scrolling to:", elementId);  // ✅ Elm отправил данные в JS
+
+            var element = document.getElementById(elementId);
+            if (element) {
+                console.log("Element found:", element);
+                element.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else {
+                console.warn("Element NOT found:", elementId);  // ❌ Elm отправил, но элемента нет
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var textarea = document.getElementById("code-area");
+            if (!textarea) {
+                return;
+            }
+
+            textarea.addEventListener('keydown', function (evt) {
+                if (evt.ctrlKey && evt.key === '/') {
+                    evt.preventDefault();
+
+                    var start = textarea.selectionStart;
+                    var end = textarea.selectionEnd;
+                    var oldCode = textarea.value;
+
+                    var result = toggleComments(oldCode, start, end);
+
+                    textarea.value = result.code;
+                    textarea.selectionStart = result.selectionStart;
+                    textarea.selectionEnd = result.selectionEnd;
+
+                    app.ports.updateCodeFromJs.send(result.code);
+                }
+            });
+
+
+            function toggleComments(code, start, end) {
+                function uncommentLine(line) {
+                    return line.replace(/^(\s*)\/\/\s?/, '$1');
+                }
+
+                function commentLine(line) {
+                    return line.replace(/^(\s*)/, '$1//');
+                }
+
+                if (start === end) {
+                    const lines = code.split('\n');
+                    let currentPos = 0;
+                    let newStart = start;
+                    let newEnd = end;
+
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        const lineStart = currentPos;
+                        const lineEnd = currentPos + line.length;
+
+                        if (start >= lineStart && start <= lineEnd) {
+                            if (/^\s*\/\//.test(line)) {
+                                const newLine = uncommentLine(line);
+                                const diff = line.length - newLine.length;
+                                lines[i] = newLine;
+                                newStart -= diff;
+                                newEnd -= diff;
+                            } else {
+                                const newLine = commentLine(line);
+                                const diff = newLine.length - line.length;
+                                lines[i] = newLine;
+                                newStart += diff;
+                                newEnd += diff;
+                            }
+                            break;
+                        }
+
+                        currentPos += line.length + 1;
+                    }
+
+                    return {
+                        code: lines.join('\n'),
+                        selectionStart: newStart,
+                        selectionEnd: newEnd
+                    };
+                } else {
+                    const before = code.slice(0, start);
+                    const selection = code.slice(start, end);
+                    const after = code.slice(end);
+
+                    const lines = selection.split('\n');
+
+                    const allCommented = lines.every(line => /^\s*\/\//.test(line));
+
+                    let diffTotal = 0;
+                    const toggled = lines.map(line => {
+                        let newLine;
+                        if (allCommented) {
+                            newLine = uncommentLine(line);
+                        } else {
+                            newLine = commentLine(line);
+                        }
+                        diffTotal += newLine.length - line.length;
+                        return newLine;
+                    });
+
+                    return {
+                        code: before + toggled.join('\n') + after,
+                        selectionStart: start,
+                        selectionEnd: end + diffTotal
+                    };
+                }
+            }
+
+
+        });
+    </script>
+
+    <script>
+        app.ports.scrollOverlayTo.subscribe(function (scrollTop) {
+            var overlay = document.querySelector('.highlight-overlay');
+            if (overlay) {
+                overlay.scrollTop = scrollTop;
+            }
+        });
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(function (reg) {
+                    console.log('Service worker registered.', reg);
+                });
+        }
+    </script>
+</body>
+
+</html>

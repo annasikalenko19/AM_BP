@@ -1,0 +1,13 @@
+{
+  "name": "am",
+  "version": "1.0.0",
+  "main": "elm.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "elm-live src/Main.elm --open --pushstate -- --output=elm.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

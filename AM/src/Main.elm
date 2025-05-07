@@ -17,16 +17,18 @@ import Html exposing (ul)
 import Html exposing (li)
 import Html exposing (thead)
 import Html exposing (tbody)
+import Html.Attributes exposing (spellcheck)
+import Html.Attributes exposing (attribute)
 
 port importCode  : () -> Cmd msg
 port exportCode : String -> Cmd msg
-port receiveCode : (String -> msg) -> Sub msg
+port receiveCodeFromFile : (String -> msg) -> Sub msg
 
-port scrollToElement : String -> Cmd msg  
+port scrollToRowInParsedTable : String -> Cmd msg  
 
-port scrollToRegister : String -> Cmd msg
+port scrollToRowInRegisterTable : String -> Cmd msg
 port scrollOverlayTo : Float -> Cmd msg
-port updateCodeFromJs : (String -> msg) -> Sub msg
+port updateCodeWithComments : (String -> msg) -> Sub msg
 port saveToLocalStorage : String -> Cmd msg
 -- MODEL
 
@@ -38,7 +40,6 @@ type alias Model =
     , highlightedRegister : Maybe Int
     , executedCommands : List String
     , sliderValue : Float
-    , counter : Int
     , isRunning : Bool
     , scrollPosition : Float
     , errorMessage : Maybe String
@@ -63,7 +64,6 @@ initialModel savedCode =
     , highlightedRegister = Nothing
     , executedCommands = []
     , sliderValue = 5 
-    , counter = 0
     , isRunning = False
     , scrollPosition = 0
     , errorMessage = Nothing
@@ -76,11 +76,10 @@ initialModel savedCode =
 -- UPDATE
 
 type Msg
-    = UpdateCode String
-    | CompileCode
+    = CompileCode
     | ExportCode
     | ImportCode
-    | CodeReceived String
+    | CodeReceivedFromFile String
     | Step
     | SliderChanged String
     | StartTimer
@@ -91,7 +90,7 @@ type Msg
     | CloseError
     | ToggleHelpModal
     | IgnoredSliderChange String
-    | CodeFromJs String 
+    | CodeWithComments String 
     | UpdateCodeAndSave String
     
     
@@ -108,8 +107,8 @@ subscriptions model =
                 _ -> 1000 
     in
     Sub.batch
-        [ updateCodeFromJs CodeFromJs,
-            receiveCode CodeReceived 
+        [ updateCodeWithComments CodeWithComments,
+            receiveCodeFromFile CodeReceivedFromFile 
         , if model.isRunning && model.currentStep < List.length model.executedCommands then
             Time.every (toFloat interval) (always Step)  
           else
@@ -120,12 +119,8 @@ subscriptions model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UpdateCode newCode ->
-            ( { model | code = Debug.log "Updated code" newCode }, Cmd.none )
-
         CompileCode ->
             let
-                _= Debug.log "update in CompileCode model.stepsCount" model.stepsCount
                 newModel = compileCode model
                 shouldRun = newModel.sliderValue < 5 
             in
@@ -137,7 +132,7 @@ update msg model =
         ImportCode ->
             ( model, importCode() )
 
-        CodeReceived importedCode ->
+        CodeReceivedFromFile importedCode ->
             ( { model | code = importedCode }, Cmd.none )    
 
         Step ->
@@ -145,7 +140,8 @@ update msg model =
                 initializedModel =
                     if model.currentStep == -1 then
                         let
-                            compiledModel = compileCode model 
+                            modelWithClearedExecuted = { model | executedCommands = [] }
+                            compiledModel = compileCode modelWithClearedExecuted 
                         in
                         { compiledModel | commands = [] ,stepsCount = 0 } 
                     else
@@ -164,6 +160,7 @@ update msg model =
                     { initializedModel
                         | commands = parsedCommands
                         , registers = resetRegisters
+                        
                     } 
             in
 
@@ -202,10 +199,10 @@ update msg model =
                                             , currentStep = updatedModel.currentStep + 1
                                             , highlightedRegister = changedReg
                                         }
-                                scrollCmd = scrollToElement ("command-" ++ String.fromInt model.currentStep) 
+                                scrollCmd = scrollToRowInParsedTable ("command-" ++ String.fromInt model.currentStep) 
                                 scrollRegCmd =
                                     case changedReg of
-                                        Just regNum -> scrollToRegister ("register-" ++ String.fromInt regNum) 
+                                        Just regNum -> scrollToRowInRegisterTable ("register-" ++ String.fromInt regNum) 
                                         Nothing -> Cmd.none  
                             in
                             ( finalModel, Cmd.batch [ scrollCmd , scrollRegCmd])
@@ -223,9 +220,7 @@ update msg model =
             ( { model 
                 | currentStep = -1
                 , highlightedRegister = Nothing
-                , counter = 0
                 , isRunning = False
-                , executedCommands = []
               }
             , Cmd.none
             )
@@ -245,7 +240,7 @@ update msg model =
             ( { model | isRunning = False, currentStep = -1 ,executedCommands = []}, Cmd.none )
         
         CloseError ->
-            ({ model | errorMessage = Nothing }, Cmd.none)      
+            ({ model | errorMessage = Nothing,executedCommands = [] }, Cmd.none)      
 
         SyncScroll scrollTop ->
             ( { model | scrollPosition = scrollTop }
@@ -257,7 +252,7 @@ update msg model =
         IgnoredSliderChange _->
             (model, Cmd.none)
 
-        CodeFromJs newCode ->
+        CodeWithComments newCode ->
             ({ model | code = newCode }, Cmd.none)    
             
         UpdateCodeAndSave newCode ->
@@ -266,7 +261,7 @@ update msg model =
 
 createErrorState : String -> Model -> Model
 createErrorState errorMsg model =
-    { model | errorMessage = Just errorMsg }
+    { model | errorMessage = Just errorMsg , executedCommands = [] }
 
 
 compileCode : Model -> Model
@@ -496,7 +491,7 @@ processCommand command model =
                             if List.any (\reg -> reg.number == n) model.registers then
                                 ( { model | registers = List.map (incrementRegister n) model.registers }, True )
                             else
-                                (createErrorState ("Register " ++ String.fromInt n ++ " neexistuje. Prikaz :" ++ command) model, False)
+                                (createErrorState ("Register " ++ String.fromInt n ++ " neexistuje. Prikaz : " ++ command) model, False)
 
                         Nothing ->
                             (createErrorState "Očakávalo sa číslo po príkaze 'a', napr. a1 alebo a3." model, False)
@@ -507,7 +502,7 @@ processCommand command model =
                             if List.any (\reg -> reg.number == n) model.registers then
                                 ( { model | registers = List.map (decrementRegister n) model.registers }, True )
                             else
-                                (createErrorState ("Register " ++ String.fromInt n ++ " neexistuje. Prikaz :" ++ command) model, False)
+                                (createErrorState ("Register " ++ String.fromInt n ++ " neexistuje. Prikaz : " ++ command) model, False)
 
                         Nothing ->
                             (createErrorState "Očakávalo sa číslo po príkaze 's', napr. s1 alebo s3." model, False)
@@ -518,7 +513,7 @@ processCommand command model =
                             if List.any (\reg -> reg.number == regNum) model.registers then
                                 (executeLoop innerCommands regNum model, False)
                             else
-                                (createErrorState ("Register " ++ String.fromInt regNum ++ " neexistuje. Prikaz :" ++ command) model, False)
+                                (createErrorState ("Register " ++ String.fromInt regNum ++ " neexistuje. Prikaz : " ++ command) model, False)
 
                         Nothing ->
                             (createErrorState "Neplatný formát slučky." model, False)
@@ -762,6 +757,10 @@ view model =
                         , onInput UpdateCodeAndSave
                         , class "code-area"
                         , on "scroll" (Decode.map SyncScroll scrollDecoder)
+                        , spellcheck False
+                        , attribute "autocorrect" "off"
+                        , attribute "autocomplete" "off"
+                        , attribute "autocapitalize" "off"
                         ]
                         []
                 ]
@@ -869,9 +868,12 @@ viewError errorMsg =
             
 viewExecutedCommands : Model -> Html Msg
 viewExecutedCommands model =
-
-    table []
-        (tableHeader2 :: List.indexedMap (viewExecutedCommand model.currentStep) model.executedCommands)
+    if model.errorMessage == Nothing then
+        table []
+            (tableHeader2 :: List.indexedMap (viewExecutedCommand model.currentStep) model.executedCommands)
+    else
+        table []
+            (tableHeader2 :: List.indexedMap (viewExecutedCommand model.currentStep)[])
 
 viewExecutedCommand : Int -> Int -> String -> Html Msg
 viewExecutedCommand currentStep index command =

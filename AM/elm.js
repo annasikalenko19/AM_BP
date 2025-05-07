@@ -5313,7 +5313,6 @@ var $author$project$Main$initialModel = function (savedCode) {
 	return {
 		code: savedCode,
 		commands: _List_Nil,
-		counter: 0,
 		currentStep: -1,
 		errorMessage: $elm$core$Maybe$Nothing,
 		executedCommands: _List_Nil,
@@ -5335,11 +5334,11 @@ var $author$project$Main$initialModel = function (savedCode) {
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$json$Json$Decode$string = _Json_decodeString;
-var $author$project$Main$CodeFromJs = function (a) {
-	return {$: 'CodeFromJs', a: a};
+var $author$project$Main$CodeReceivedFromFile = function (a) {
+	return {$: 'CodeReceivedFromFile', a: a};
 };
-var $author$project$Main$CodeReceived = function (a) {
-	return {$: 'CodeReceived', a: a};
+var $author$project$Main$CodeWithComments = function (a) {
+	return {$: 'CodeWithComments', a: a};
 };
 var $author$project$Main$Step = {$: 'Step'};
 var $elm$core$Basics$always = F2(
@@ -5763,9 +5762,9 @@ var $elm$time$Time$every = F2(
 			A2($elm$time$Time$Every, interval, tagger));
 	});
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
-var $author$project$Main$receiveCode = _Platform_incomingPort('receiveCode', $elm$json$Json$Decode$string);
+var $author$project$Main$receiveCodeFromFile = _Platform_incomingPort('receiveCodeFromFile', $elm$json$Json$Decode$string);
 var $elm$core$Basics$round = _Basics_round;
-var $author$project$Main$updateCodeFromJs = _Platform_incomingPort('updateCodeFromJs', $elm$json$Json$Decode$string);
+var $author$project$Main$updateCodeWithComments = _Platform_incomingPort('updateCodeWithComments', $elm$json$Json$Decode$string);
 var $author$project$Main$subscriptions = function (model) {
 	var interval = function () {
 		var _v0 = $elm$core$Basics$round(model.sliderValue);
@@ -5785,8 +5784,8 @@ var $author$project$Main$subscriptions = function (model) {
 	return $elm$core$Platform$Sub$batch(
 		_List_fromArray(
 			[
-				$author$project$Main$updateCodeFromJs($author$project$Main$CodeFromJs),
-				$author$project$Main$receiveCode($author$project$Main$CodeReceived),
+				$author$project$Main$updateCodeWithComments($author$project$Main$CodeWithComments),
+				$author$project$Main$receiveCodeFromFile($author$project$Main$CodeReceivedFromFile),
 				(model.isRunning && (_Utils_cmp(
 				model.currentStep,
 				$elm$core$List$length(model.executedCommands)) < 0)) ? A2(
@@ -6064,7 +6063,8 @@ var $author$project$Main$createErrorState = F2(
 		return _Utils_update(
 			model,
 			{
-				errorMessage: $elm$core$Maybe$Just(errorMsg)
+				errorMessage: $elm$core$Maybe$Just(errorMsg),
+				executedCommands: _List_Nil
 			});
 	});
 var $author$project$Main$decrementRegister = F2(
@@ -6219,7 +6219,7 @@ var $author$project$Main$processCommand = F2(
 									true) : _Utils_Tuple2(
 									A2(
 										$author$project$Main$createErrorState,
-										'Register ' + ($elm$core$String$fromInt(n) + (' neexistuje. Prikaz :' + command)),
+										'Register ' + ($elm$core$String$fromInt(n) + (' neexistuje. Prikaz : ' + command)),
 										model),
 									false);
 							} else {
@@ -6250,7 +6250,7 @@ var $author$project$Main$processCommand = F2(
 									true) : _Utils_Tuple2(
 									A2(
 										$author$project$Main$createErrorState,
-										'Register ' + ($elm$core$String$fromInt(n) + (' neexistuje. Prikaz :' + command)),
+										'Register ' + ($elm$core$String$fromInt(n) + (' neexistuje. Prikaz : ' + command)),
 										model),
 									false);
 							} else {
@@ -6276,7 +6276,7 @@ var $author$project$Main$processCommand = F2(
 									false) : _Utils_Tuple2(
 									A2(
 										$author$project$Main$createErrorState,
-										'Register ' + ($elm$core$String$fromInt(regNum) + (' neexistuje. Prikaz :' + command)),
+										'Register ' + ($elm$core$String$fromInt(regNum) + (' neexistuje. Prikaz : ' + command)),
 										model),
 									false);
 							} else {
@@ -6366,7 +6366,6 @@ var $author$project$Main$importCode = _Platform_outgoingPort(
 	function ($) {
 		return $elm$json$Json$Encode$null;
 	});
-var $elm$core$Debug$log = _Debug_log;
 var $author$project$Main$processCommandStep = F2(
 	function (command, registers) {
 		var _v0 = $elm$core$String$uncons(command);
@@ -6438,8 +6437,8 @@ var $author$project$Main$processCommandStep = F2(
 var $author$project$Main$saveToLocalStorage = _Platform_outgoingPort('saveToLocalStorage', $elm$json$Json$Encode$string);
 var $elm$json$Json$Encode$float = _Json_wrap;
 var $author$project$Main$scrollOverlayTo = _Platform_outgoingPort('scrollOverlayTo', $elm$json$Json$Encode$float);
-var $author$project$Main$scrollToElement = _Platform_outgoingPort('scrollToElement', $elm$json$Json$Encode$string);
-var $author$project$Main$scrollToRegister = _Platform_outgoingPort('scrollToRegister', $elm$json$Json$Encode$string);
+var $author$project$Main$scrollToRowInParsedTable = _Platform_outgoingPort('scrollToRowInParsedTable', $elm$json$Json$Encode$string);
+var $author$project$Main$scrollToRowInRegisterTable = _Platform_outgoingPort('scrollToRowInRegisterTable', $elm$json$Json$Encode$string);
 var $elm$core$String$toFloat = _String_toFloat;
 var $elm$core$Maybe$withDefault = F2(
 	function (_default, maybe) {
@@ -6455,19 +6454,9 @@ var $author$project$Main$update = F2(
 		update:
 		while (true) {
 			switch (msg.$) {
-				case 'UpdateCode':
-					var newCode = msg.a;
-					return _Utils_Tuple2(
-						_Utils_update(
-							model,
-							{
-								code: A2($elm$core$Debug$log, 'Updated code', newCode)
-							}),
-						$elm$core$Platform$Cmd$none);
 				case 'CompileCode':
 					var newModel = $author$project$Main$compileCode(model);
 					var shouldRun = newModel.sliderValue < 5;
-					var _v1 = A2($elm$core$Debug$log, 'update in CompileCode model.stepsCount', model.stepsCount);
 					return _Utils_Tuple2(
 						_Utils_update(
 							newModel,
@@ -6481,7 +6470,7 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						model,
 						$author$project$Main$importCode(_Utils_Tuple0));
-				case 'CodeReceived':
+				case 'CodeReceivedFromFile':
 					var importedCode = msg.a;
 					return _Utils_Tuple2(
 						_Utils_update(
@@ -6491,7 +6480,10 @@ var $author$project$Main$update = F2(
 				case 'Step':
 					var initializedModel = function () {
 						if (_Utils_eq(model.currentStep, -1)) {
-							var compiledModel = $author$project$Main$compileCode(model);
+							var modelWithClearedExecuted = _Utils_update(
+								model,
+								{executedCommands: _List_Nil});
+							var compiledModel = $author$project$Main$compileCode(modelWithClearedExecuted);
 							return _Utils_update(
 								compiledModel,
 								{commands: _List_Nil, stepsCount: 0});
@@ -6531,15 +6523,15 @@ var $author$project$Main$update = F2(
 										{currentStep: 0}),
 									$elm$core$Platform$Cmd$none);
 							} else {
-								var scrollCmd = $author$project$Main$scrollToElement(
+								var scrollCmd = $author$project$Main$scrollToRowInParsedTable(
 									'command-' + $elm$core$String$fromInt(model.currentStep));
-								var _v3 = A2($author$project$Main$processCommandStep, cmd, updatedModel.registers);
-								var updatedRegs = _v3.a;
-								var changedReg = _v3.b;
+								var _v2 = A2($author$project$Main$processCommandStep, cmd, updatedModel.registers);
+								var updatedRegs = _v2.a;
+								var changedReg = _v2.b;
 								var scrollRegCmd = function () {
 									if (changedReg.$ === 'Just') {
 										var regNum = changedReg.a;
-										return $author$project$Main$scrollToRegister(
+										return $author$project$Main$scrollToRowInRegisterTable(
 											'register-' + $elm$core$String$fromInt(regNum));
 									} else {
 										return $elm$core$Platform$Cmd$none;
@@ -6584,7 +6576,7 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{counter: 0, currentStep: -1, executedCommands: _List_Nil, highlightedRegister: $elm$core$Maybe$Nothing, isRunning: false}),
+							{currentStep: -1, highlightedRegister: $elm$core$Maybe$Nothing, isRunning: false}),
 						$elm$core$Platform$Cmd$none);
 				case 'ExecuteAction':
 					var resetModel = _Utils_update(
@@ -6616,7 +6608,7 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{errorMessage: $elm$core$Maybe$Nothing}),
+							{errorMessage: $elm$core$Maybe$Nothing, executedCommands: _List_Nil}),
 						$elm$core$Platform$Cmd$none);
 				case 'SyncScroll':
 					var scrollTop = msg.a;
@@ -6633,7 +6625,7 @@ var $author$project$Main$update = F2(
 						$elm$core$Platform$Cmd$none);
 				case 'IgnoredSliderChange':
 					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				case 'CodeFromJs':
+				case 'CodeWithComments':
 					var newCode = msg.a;
 					return _Utils_Tuple2(
 						_Utils_update(
@@ -6664,6 +6656,14 @@ var $author$project$Main$ToggleHelpModal = {$: 'ToggleHelpModal'};
 var $author$project$Main$UpdateCodeAndSave = function (a) {
 	return {$: 'UpdateCodeAndSave', a: a};
 };
+var $elm$virtual_dom$VirtualDom$attribute = F2(
+	function (key, value) {
+		return A2(
+			_VirtualDom_attribute,
+			_VirtualDom_noOnOrFormAction(key),
+			_VirtualDom_noJavaScriptOrHtmlUri(value));
+	});
+var $elm$html$Html$Attributes$attribute = $elm$virtual_dom$VirtualDom$attribute;
 var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$html$Html$Attributes$stringProperty = F2(
 	function (key, string) {
@@ -6868,6 +6868,15 @@ var $author$project$Main$scrollDecoder = A2(
 	_List_fromArray(
 		['target', 'scrollTop']),
 	$elm$json$Json$Decode$float);
+var $elm$json$Json$Encode$bool = _Json_wrap;
+var $elm$html$Html$Attributes$boolProperty = F2(
+	function (key, bool) {
+		return A2(
+			_VirtualDom_property,
+			key,
+			$elm$json$Json$Encode$bool(bool));
+	});
+var $elm$html$Html$Attributes$spellcheck = $elm$html$Html$Attributes$boolProperty('spellcheck');
 var $elm$html$Html$table = _VirtualDom_node('table');
 var $elm$html$Html$th = _VirtualDom_node('th');
 var $elm$html$Html$tr = _VirtualDom_node('tr');
@@ -7006,7 +7015,7 @@ var $author$project$Main$viewExecutedCommand = F3(
 				]));
 	});
 var $author$project$Main$viewExecutedCommands = function (model) {
-	return A2(
+	return _Utils_eq(model.errorMessage, $elm$core$Maybe$Nothing) ? A2(
 		$elm$html$Html$table,
 		_List_Nil,
 		A2(
@@ -7015,7 +7024,16 @@ var $author$project$Main$viewExecutedCommands = function (model) {
 			A2(
 				$elm$core$List$indexedMap,
 				$author$project$Main$viewExecutedCommand(model.currentStep),
-				model.executedCommands)));
+				model.executedCommands))) : A2(
+		$elm$html$Html$table,
+		_List_Nil,
+		A2(
+			$elm$core$List$cons,
+			$author$project$Main$tableHeader2,
+			A2(
+				$elm$core$List$indexedMap,
+				$author$project$Main$viewExecutedCommand(model.currentStep),
+				_List_Nil)));
 };
 var $author$project$Main$IgnoredSliderChange = function (a) {
 	return {$: 'IgnoredSliderChange', a: a};
@@ -7852,7 +7870,11 @@ var $author$project$Main$view = function (model) {
 										A2(
 										$elm$html$Html$Events$on,
 										'scroll',
-										A2($elm$json$Json$Decode$map, $author$project$Main$SyncScroll, $author$project$Main$scrollDecoder))
+										A2($elm$json$Json$Decode$map, $author$project$Main$SyncScroll, $author$project$Main$scrollDecoder)),
+										$elm$html$Html$Attributes$spellcheck(false),
+										A2($elm$html$Html$Attributes$attribute, 'autocorrect', 'off'),
+										A2($elm$html$Html$Attributes$attribute, 'autocomplete', 'off'),
+										A2($elm$html$Html$Attributes$attribute, 'autocapitalize', 'off')
 									]),
 								_List_Nil)
 							])),

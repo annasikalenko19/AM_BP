@@ -15,14 +15,14 @@
     <script src="elm.js"></script>
 
     <script>
-        const savedCode = localStorage.getItem("savedCode") || "";
+        const savedCode = localStorage.getItem("savedCode_am") || "";
 
         var app = Elm.Main.init({
             node: document.getElementById('elm'),
             flags: savedCode
         });
         app.ports.saveToLocalStorage.subscribe(function (code) {
-            localStorage.setItem("savedCode", code);
+            localStorage.setItem("savedCode_am", code);
         });
 
         app.ports.exportCode.subscribe(function (codeContent) {
@@ -53,7 +53,7 @@
                         const reader = new FileReader();
                         reader.onload = () => {
                             const content = reader.result;
-                            app.ports.receiveCode.send(content);
+                            app.ports.receiveCodeFromFile.send(content);
                         };
                         reader.readAsText(file);
                     }
@@ -72,26 +72,24 @@
     </script>
 
     <script>
-        app.ports.scrollToElement.subscribe(function (elementId) {
-            console.log("Port received:", elementId);  // ✅ Должно появиться в Console
+        app.ports.scrollToRowInParsedTable.subscribe(function (elementId) {
+          
             scrollToElement(elementId);
         });
 
-        app.ports.scrollToRegister.subscribe(function (elementId) {
-            console.log("Scrolling to register:", elementId);
+        app.ports.scrollToRowInRegisterTable.subscribe(function (elementId) {
+        
             scrollToElement(elementId);
         });
 
         function scrollToElement(elementId) {
-            console.log("Scrolling to:", elementId);  // ✅ Elm отправил данные в JS
+        
 
             var element = document.getElementById(elementId);
             if (element) {
-                console.log("Element found:", element);
+               
                 element.scrollIntoView({ behavior: "smooth", block: "center" });
-            } else {
-                console.warn("Element NOT found:", elementId);  // ❌ Elm отправил, но элемента нет
-            }
+            } 
         }
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -114,7 +112,7 @@
                     textarea.selectionStart = result.selectionStart;
                     textarea.selectionEnd = result.selectionEnd;
 
-                    app.ports.updateCodeFromJs.send(result.code);
+                    app.ports.updateCodeWithComments.send(result.code);
                 }
             });
 
